@@ -46,6 +46,7 @@ export const PRICE_SAFETY_PLATFORM = 400;
 
 /** Continue / fail */
 export const CONTINUE_TIMEOUT = 6; // seconds
+/** Max continues per run: one bird rescue + one safety platform (tracked separately). */
 export const MAX_CONTINUES = 2;
 /** Pixels below viewport before danger-line / fall triggers */
 export const DANGER_LINE_MARGIN = 48;

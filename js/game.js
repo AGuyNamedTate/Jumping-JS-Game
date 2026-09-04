@@ -7,7 +7,6 @@ import {
   LOGICAL_HEIGHT,
   FIXED_DT,
   MAX_FRAME_DT,
-  MAX_CONTINUES,
   SKY_COLOR,
 } from './constants.js';
 import * as storage from './storage.js';
@@ -61,10 +60,12 @@ export const run = {
   score: 0,
   height: 0,
   continuesUsed: 0,
+  birdUsed: false,
+  safetyUsed: false,
   solidLands: 0,
-  landGrantsGiven: 0,
   prevBestScore: 0,
   highScoreCelebrated: false,
+  highScoreBirdGranted: false,
 };
 
 /** @type {Set<string>} */
@@ -165,6 +166,8 @@ function update(dt) {
   run.score = session.score;
   run.height = Math.floor(session.maxHeight);
   run.continuesUsed = session.continuesUsed;
+  run.birdUsed = session.birdUsed;
+  run.safetyUsed = session.safetyUsed;
 
   hudScore.setTrueScore(run.height, run.score);
   hudScore.setAscending(session.player.vy < 0);
@@ -174,6 +177,15 @@ function update(dt) {
   if (!run.highScoreCelebrated && run.score > run.prevBestScore) {
     audio.playSfx('highscore');
     run.highScoreCelebrated = true;
+    const result = checkMilestones(storage.load(), {
+      prevBestScore: run.prevBestScore,
+      currentScore: run.score,
+      highScoreBirdGranted: run.highScoreBirdGranted,
+    });
+    run.highScoreBirdGranted = !!result.grants.length || run.highScoreBirdGranted;
+    if (result.notified) {
+      syncPlayingHud(result.save);
+    }
   }
 
   const save = storage.load();
@@ -209,26 +221,13 @@ function handleLand(platform) {
   }
   if (platform?.type === 'solid') {
     run.solidLands += 1;
-    const result = checkMilestones(storage.load(), {
-      solidLands: run.solidLands,
-      landGrantsGiven: run.landGrantsGiven,
-      prevBestScore: run.prevBestScore,
-    });
-    run.landGrantsGiven = Math.floor(run.solidLands / 15);
-    if (result.notified) {
-      syncPlayingHud(result.save);
-    }
   }
 }
 
 function tryOfferContinue() {
   if (!session || state !== 'playing') return;
-  if (session.continuesUsed >= MAX_CONTINUES) {
-    endRun();
-    return;
-  }
-  const hasBird = canUse('rescueBird');
-  const hasSafety = canUse('safetyPlatform');
+  const hasBird = canUse('rescueBird') && !session.birdUsed;
+  const hasSafety = canUse('safetyPlatform') && !session.safetyUsed;
   if (!hasBird && !hasSafety) {
     endRun();
     return;
@@ -356,10 +355,12 @@ export function startGame() {
   run.score = 0;
   run.height = 0;
   run.continuesUsed = 0;
+  run.birdUsed = false;
+  run.safetyUsed = false;
   run.solidLands = 0;
-  run.landGrantsGiven = 0;
   run.prevBestScore = save.bestScore;
   run.highScoreCelebrated = false;
+  run.highScoreBirdGranted = false;
   brokenSeen.clear();
   art.clearParticles();
   hudScore.reset();
@@ -414,11 +415,13 @@ export function endRun() {
 
   const prevBest = run.prevBestScore;
   const data = storage.addRun(run.score, run.height);
-  checkMilestones(data, {
+  const milestone = checkMilestones(data, {
     prevBestScore: prevBest,
-    solidLands: run.solidLands,
-    landGrantsGiven: run.landGrantsGiven,
+    currentScore: run.score,
+    highScoreBirdGranted: run.highScoreBirdGranted,
   });
+  run.highScoreBirdGranted =
+    !!milestone.grants.length || run.highScoreBirdGranted;
 
   setState('gameOver');
   showScreen('gameOver');
@@ -456,13 +459,21 @@ export function step(dt = FIXED_DT) {
 /**
  * Force session status into the state machine (tests / debug).
  * @param {'ok'|'danger'|'dead'} status
- * @param {{ continuesUsed?: number }} [opts]
+ * @param {{ continuesUsed?: number, birdUsed?: boolean, safetyUsed?: boolean }} [opts]
  */
 export function injectStatus(status, opts = {}) {
   if (!session) return;
   if (typeof opts.continuesUsed === 'number') {
     session.continuesUsed = opts.continuesUsed;
     run.continuesUsed = opts.continuesUsed;
+  }
+  if (typeof opts.birdUsed === 'boolean') {
+    session.birdUsed = opts.birdUsed;
+    run.birdUsed = opts.birdUsed;
+  }
+  if (typeof opts.safetyUsed === 'boolean') {
+    session.safetyUsed = opts.safetyUsed;
+    run.safetyUsed = opts.safetyUsed;
   }
   session.status = status;
   if (status === 'danger' && state === 'playing') {
@@ -492,6 +503,8 @@ if (typeof window !== 'undefined') {
             player: { x: session.player.x, y: session.player.y, vy: session.player.vy, grounded: session.player.grounded },
             score: session.score,
             continuesUsed: session.continuesUsed,
+            birdUsed: session.birdUsed,
+            safetyUsed: session.safetyUsed,
             status: session.status,
             platforms: session.world.platforms
               .filter((p) => !p.broken)
