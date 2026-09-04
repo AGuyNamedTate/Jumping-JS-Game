@@ -20,6 +20,7 @@ describe('assets', () => {
     expect(Array.isArray(assets.IMAGE_PATHS)).toBe(true);
     expect(assets.AUDIO_PATHS.length).toBeGreaterThan(0);
     expect(assets.AUDIO_PATHS.some((p) => p.includes('jump'))).toBe(true);
+    expect(assets.AUDIO_PATHS.some((p) => /bgm\.(ogg|mp3)$/.test(p))).toBe(true);
   });
 
   describe('loadImages', () => {
@@ -237,6 +238,44 @@ describe('assets', () => {
 
       const result = await assets.loadAudio(['assets/audio/jump.wav']);
       expect(result.jump).toBeInstanceOf(OkAudio);
+    });
+
+    it('enables loop on successfully loaded bgm file', async () => {
+      class OkAudio {
+        constructor() {
+          this.preload = '';
+          this._src = '';
+          this.loop = false;
+          /** @type {Map<string, Function[]>} */
+          this._listeners = new Map();
+        }
+        addEventListener(type, fn) {
+          if (!this._listeners.has(type)) this._listeners.set(type, []);
+          this._listeners.get(type).push(fn);
+        }
+        removeEventListener(type, fn) {
+          const list = this._listeners.get(type);
+          if (!list) return;
+          const i = list.indexOf(fn);
+          if (i >= 0) list.splice(i, 1);
+        }
+        set src(v) {
+          this._src = v;
+          queueMicrotask(() => {
+            for (const fn of this._listeners.get('canplaythrough') ?? []) fn();
+          });
+        }
+        get src() {
+          return this._src;
+        }
+      }
+      vi.stubGlobal('Audio', OkAudio);
+      stubOfflineAudioContext();
+
+      const result = await assets.loadAudio(['assets/audio/bgm.ogg']);
+      expect(result.bgm).toBeInstanceOf(OkAudio);
+      expect(result.bgm.loop).toBe(true);
+      expect(String(result.bgm.src)).toContain('bgm.ogg');
     });
 
     it('falls back to PCM beep when OfflineAudioContext is unavailable', async () => {

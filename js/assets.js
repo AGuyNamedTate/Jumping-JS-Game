@@ -50,6 +50,7 @@ export async function loadAudio(paths = []) {
       const key = path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? path;
       try {
         const audio = await loadAudioElement(path);
+        if (key === 'bgm') audio.loop = true;
         result[key] = audio;
       } catch {
         result[key] = null;
@@ -355,5 +356,5 @@ export const AUDIO_PATHS = [
   'assets/audio/fall.wav',
   'assets/audio/highscore.wav',
   'assets/audio/rescue.wav',
-  'assets/audio/bgm.wav',
+  'assets/audio/bgm.ogg',
 ];
