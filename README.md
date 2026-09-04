@@ -6,11 +6,7 @@ Charge a jump, hop shaky stone platforms, and race your high score up a fantasy 
 
 ## Play
 
-**Live:** _(URL appears after the first GitHub Pages deploy)_
-
-```text
-https://AGuyNamedTate.github.io/Jumping-JS-Game/
-```
+**Live:** [https://aguynamedtate.github.io/Jumping-JS-Game/](https://aguynamedtate.github.io/Jumping-JS-Game/)
 
 ## Run locally
 
