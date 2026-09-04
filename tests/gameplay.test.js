@@ -34,6 +34,8 @@ describe('gameplay', () => {
       expect(session.maxHeight).toBe(0);
       expect(session.score).toBe(0);
       expect(session.continuesUsed).toBe(0);
+      expect(session.birdUsed).toBe(false);
+      expect(session.safetyUsed).toBe(false);
       expect(session._wasGrounded).toBe(true);
       expect(session.cosmetics).toEqual({ hat: false, goldenSword: false });
       expect(session.onLand).toBeNull();
@@ -63,6 +65,8 @@ describe('gameplay', () => {
       session.maxHeight = 500;
       session.score = 50;
       session.continuesUsed = 2;
+      session.birdUsed = true;
+      session.safetyUsed = true;
       session.status = 'dead';
       session._wasGrounded = false;
       session.player.vx = 99;
@@ -75,6 +79,8 @@ describe('gameplay', () => {
       expect(session.maxHeight).toBe(0);
       expect(session.score).toBe(0);
       expect(session.continuesUsed).toBe(0);
+      expect(session.birdUsed).toBe(false);
+      expect(session.safetyUsed).toBe(false);
       expect(session.status).toBe('ok');
       expect(session._wasGrounded).toBe(true);
       expect(session.player.vx).toBe(0);
@@ -358,7 +364,7 @@ describe('gameplay', () => {
   });
 
   describe('applyRescueBird', () => {
-    it('places player on rescue target and bumps continuesUsed', () => {
+    it('places player on rescue target, marks birdUsed, bumps continuesUsed', () => {
       const session = createSession();
       session.status = 'danger';
       session.player.vy = 500;
@@ -368,6 +374,8 @@ describe('gameplay', () => {
       const ok = applyRescueBird(session);
       expect(ok).toBe(true);
       expect(session.status).toBe('ok');
+      expect(session.birdUsed).toBe(true);
+      expect(session.safetyUsed).toBe(false);
       expect(session.continuesUsed).toBe(used + 1);
       expect(session.player.vx).toBe(0);
       expect(session.player.vy).toBe(0);
@@ -390,6 +398,7 @@ describe('gameplay', () => {
       session.world.platforms = [];
       expect(applyRescueBird(session)).toBe(false);
       expect(session.continuesUsed).toBe(0);
+      expect(session.birdUsed).toBe(false);
     });
 
     it('reframes camera when player is near view bottom', () => {
@@ -403,7 +412,7 @@ describe('gameplay', () => {
   });
 
   describe('applySafetyPlatform', () => {
-    it('spawns ledge under player and resets motion', () => {
+    it('spawns ledge under player, marks safetyUsed, and resets motion', () => {
       const session = createSession();
       session.status = 'danger';
       session.player.x = 50;
@@ -416,6 +425,8 @@ describe('gameplay', () => {
       expect(ok).toBe(true);
       expect(session.world.platforms.length).toBe(count + 1);
       expect(session.status).toBe('ok');
+      expect(session.safetyUsed).toBe(true);
+      expect(session.birdUsed).toBe(false);
       expect(session.continuesUsed).toBe(1);
       expect(session.player.vy).toBe(0);
       expect(session.player.grounded).toBe(true);

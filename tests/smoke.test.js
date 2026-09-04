@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   FIXED_DT,
-  MAX_CONTINUES,
   PRICE_HAT,
   PRICE_RESCUE_BIRD,
   CONTINUE_TIMEOUT,
@@ -325,7 +324,7 @@ describe('smoke: store buy & cosmetics', () => {
 });
 
 describe('smoke: continue offer flows', () => {
-  it('smoke: continue Use Bird resumes playing; Safety then Let Go ends run', () => {
+  it('smoke: continue Use Bird resumes playing; Safety then next fall ends run', () => {
     boot({});
     storage.addInventory('rescueBird', 2);
     storage.addInventory('safetyPlatform', 1);
@@ -347,11 +346,9 @@ describe('smoke: continue offer flows', () => {
     expect(game.getState()).toBe('playing');
     expect(storage.load().inventory.safetyPlatform).toBe(0);
 
+    // Both types used this run — extra birds do not unlock another continue
     storage.addInventory('rescueBird', 1);
-    // Under MAX_CONTINUES so the offer appears (bird+safety already spent 2)
-    game.injectStatus('danger', { continuesUsed: MAX_CONTINUES - 1 });
-    expect(game.getState()).toBe('continueOffer');
-    click('btn-let-go');
+    game.injectStatus('danger');
     expect(game.getState()).toBe('gameOver');
   });
 
@@ -367,35 +364,52 @@ describe('smoke: continue offer flows', () => {
     expect(game.getState()).toBe('gameOver');
   });
 
-  it('smoke: continuesUsed at MAX_CONTINUES ends run without offer', () => {
+  it('smoke: bird used this run with remaining birds ends without offer when no safety', () => {
     boot({});
     storage.addInventory('rescueBird', 5);
     game.startGame();
 
-    game.injectStatus('danger', { continuesUsed: MAX_CONTINUES });
+    game.injectStatus('danger', { birdUsed: true });
     expect(game.getState()).toBe('gameOver');
     expect(isVisible('screen-continue')).toBe(false);
+  });
+
+  it('smoke: two birds and no safety — second fall is game over', () => {
+    boot({});
+    storage.addInventory('rescueBird', 2);
+    game.startGame();
+
+    game.injectStatus('danger');
+    expect(game.getState()).toBe('continueOffer');
+    click('btn-use-bird');
+    expect(game.getState()).toBe('playing');
+    expect(storage.load().inventory.rescueBird).toBe(1);
+
+    game.injectStatus('danger');
+    expect(game.getState()).toBe('gameOver');
   });
 });
 
 describe('smoke: milestones, assets, art, loop', () => {
-  it('smoke: milestones solid lands / score band grant birds', () => {
+  it('smoke: new high score grants one bird; land milestones do not', () => {
     boot({});
     let data = storage.load();
     data.bestScore = 500;
     data = storage.save(data);
-    const band = inventory.checkMilestones(data, { prevBestScore: 0 });
-    expect(band.grants.some((g) => g.type === 'scoreBand')).toBe(true);
-    expect(storage.load().inventory.rescueBird).toBeGreaterThanOrEqual(1);
+    const best = inventory.checkMilestones(data, { prevBestScore: 0 });
+    expect(best.grants.some((g) => g.type === 'newHighScore')).toBe(true);
+    expect(best.grants[0].amount).toBe(1);
+    expect(storage.load().inventory.rescueBird).toBe(1);
 
     const birdsBefore = storage.load().inventory.rescueBird;
     const lands = inventory.checkMilestones(storage.load(), {
       solidLands: 15,
       landGrantsGiven: 0,
       prevBestScore: storage.load().bestScore,
+      currentScore: storage.load().bestScore,
     });
-    expect(lands.grants.some((g) => g.type === 'solidLands')).toBe(true);
-    expect(storage.load().inventory.rescueBird).toBe(birdsBefore + 1);
+    expect(lands.grants).toHaveLength(0);
+    expect(storage.load().inventory.rescueBird).toBe(birdsBefore);
   });
 
   it('smoke: loadImages([]) and loadAudio failing paths return procedural audio keys', async () => {

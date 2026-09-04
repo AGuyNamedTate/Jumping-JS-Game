@@ -16,6 +16,8 @@ import * as cameraMod from './camera.js';
  *   maxHeight: number,
  *   score: number,
  *   continuesUsed: number,
+ *   birdUsed: boolean,
+ *   safetyUsed: boolean,
  *   status: 'ok'|'danger'|'dead',
  *   cosmetics: { hat: boolean, goldenSword: boolean },
  *   onLand: ((platform: object) => void) | null,
@@ -48,6 +50,8 @@ export function createSession(opts = {}) {
     maxHeight: 0,
     score: 0,
     continuesUsed: 0,
+    birdUsed: false,
+    safetyUsed: false,
     status: 'ok',
     cosmetics: {
       hat: !!opts.cosmetics?.hat,
@@ -77,6 +81,8 @@ export function resetSession(session, opts = {}) {
   session.maxHeight = 0;
   session.score = 0;
   session.continuesUsed = 0;
+  session.birdUsed = false;
+  session.safetyUsed = false;
   session.status = 'ok';
   session._wasGrounded = true;
 
@@ -186,7 +192,7 @@ export function drawSession(ctx, session) {
 }
 
 /**
- * Carry player to a safe platform; bumps continuesUsed.
+ * Carry player to a safe platform; marks bird used for this run.
  * @param {Session} session
  * @returns {boolean}
  */
@@ -203,13 +209,14 @@ export function applyRescueBird(session) {
   p.charge = 0;
 
   framePlayerInView(session);
+  session.birdUsed = true;
   session.continuesUsed += 1;
   session.status = 'ok';
   return true;
 }
 
 /**
- * Spawn a ledge under the falling player; bumps continuesUsed.
+ * Spawn a ledge under the falling player; marks safety used for this run.
  * @param {Session} session
  * @returns {boolean}
  */
@@ -224,6 +231,7 @@ export function applySafetyPlatform(session) {
   p.charge = 0;
 
   framePlayerInView(session);
+  session.safetyUsed = true;
   session.continuesUsed += 1;
   session.status = 'ok';
   return true;

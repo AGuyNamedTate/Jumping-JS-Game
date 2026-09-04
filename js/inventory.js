@@ -1,16 +1,10 @@
 /**
- * Inventory helpers + milestone rewards.
+ * Inventory helpers + high-score bird reward.
  *
- * Milestone rules (simple, first-time / per-run):
- * 1. Best-score bands — every time bestScore newly crosses a multiple of 500
- *    (500, 1000, 1500, …), grant +1 rescueBird. Uses runStats.prevBestScore
- *    (best before this run) vs current save.bestScore.
- * 2. Solid lands — every 15 solid platform lands within a single run grants
- *    +1 rescueBird. Tracks progress via runStats.landGrantsGiven (mutated).
+ * When a run first beats the previous personal best, grant exactly +1 rescueBird
+ * once per that achievement. No land-milestone or score-band mid-run grants.
  */
 import * as storage from './storage.js';
-const SCORE_BAND = 500;
-const LANDS_PER_BIRD = 15;
 /**
  * @returns {{ rescueBird: number, safetyPlatform: number }}
  */
@@ -34,15 +28,20 @@ export function use(key) {
 }
 /**
  * @typedef {{
- *   solidLands?: number,
  *   prevBestScore?: number,
- *   landGrantsGiven?: number,
+ *   score?: number,
+ *   currentScore?: number,
+ *   highScoreBirdGranted?: boolean,
  * }} RunStats
  *
  * @typedef {{ type: string, item: string, amount: number, detail: string }} MilestoneGrant
  */
 /**
- * Check and apply milestone grants. Mutates runStats.landGrantsGiven when awarding land bands.
+ * Grant +1 rescueBird when the run beats the previous personal best.
+ * Skips if highScoreBirdGranted is already true (mid-run grant already applied).
+ *
+ * Prefer passing runStats.currentScore / score during play; otherwise uses
+ * save.bestScore (e.g. after addRun at end of run).
  *
  * @param {import('./storage.js').SaveData} save
  * @param {RunStats} [runStats={}]
@@ -56,36 +55,32 @@ export function checkMilestones(save, runStats = {}) {
   /** @type {MilestoneGrant[]} */
   const grants = [];
   let data = save ?? storage.load();
+
+  if (runStats.highScoreBirdGranted) {
+    return { save: data, grants, notified: false };
+  }
+
   const prevBest = Number.isFinite(runStats.prevBestScore)
     ? Math.max(0, Math.floor(runStats.prevBestScore))
     : 0;
-  const best = Math.max(0, Math.floor(data.bestScore ?? 0));
-  const prevBand = Math.floor(prevBest / SCORE_BAND);
-  const curBand = Math.floor(best / SCORE_BAND);
-  if (curBand > prevBand) {
-    const birds = curBand - prevBand;
-    data = storage.addInventory('rescueBird', birds);
+  const liveScore = Number.isFinite(runStats.currentScore)
+    ? runStats.currentScore
+    : runStats.score;
+  const score = Number.isFinite(liveScore)
+    ? Math.max(0, Math.floor(liveScore))
+    : Math.max(0, Math.floor(data.bestScore ?? 0));
+
+  if (score > prevBest) {
+    data = storage.addInventory('rescueBird', 1);
+    runStats.highScoreBirdGranted = true;
     grants.push({
-      type: 'scoreBand',
+      type: 'newHighScore',
       item: 'rescueBird',
-      amount: birds,
-      detail: `Best score band ×${SCORE_BAND}: +${birds} rescue bird${birds > 1 ? 's' : ''}`,
+      amount: 1,
+      detail: 'New high score: +1 rescue bird',
     });
   }
-  const solidLands = Math.max(0, Math.floor(runStats.solidLands ?? 0));
-  const already = Math.max(0, Math.floor(runStats.landGrantsGiven ?? 0));
-  const earned = Math.floor(solidLands / LANDS_PER_BIRD);
-  const newLandGrants = earned - already;
-  if (newLandGrants > 0) {
-    data = storage.addInventory('rescueBird', newLandGrants);
-    runStats.landGrantsGiven = already + newLandGrants;
-    grants.push({
-      type: 'solidLands',
-      item: 'rescueBird',
-      amount: newLandGrants,
-      detail: `Solid lands (every ${LANDS_PER_BIRD}): +${newLandGrants} rescue bird${newLandGrants > 1 ? 's' : ''}`,
-    });
-  }
+
   const notified = grants.length > 0;
   if (notified && typeof console !== 'undefined') {
     for (const g of grants) {
