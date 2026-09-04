@@ -9,7 +9,7 @@ Charge a jump, hop shaky stone platforms, and race your high score up a fantasy 
 **Live:** _(URL appears after the first GitHub Pages deploy)_
 
 ```text
-https://<your-github-username>.github.io/Jumping-JS-Game/
+https://AGuyNamedTate.github.io/Jumping-JS-Game/
 ```
 
 ## Run locally
