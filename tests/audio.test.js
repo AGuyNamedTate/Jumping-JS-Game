@@ -150,6 +150,18 @@ describe('audio', () => {
       await Promise.resolve();
     });
 
+    it('re-enables loop each play so file BGM keeps looping', () => {
+      const bgm = createMockAudio();
+      bgm.loop = false;
+      init({ bgm }, false);
+      playBgm();
+      expect(bgm.loop).toBe(true);
+      bgm.loop = false;
+      playBgm();
+      expect(bgm.loop).toBe(true);
+      expect(bgm.play).toHaveBeenCalledTimes(2);
+    });
+
     it('plays muted bgm silently when muted', () => {
       const bgm = createMockAudio();
       init({ bgm }, true);

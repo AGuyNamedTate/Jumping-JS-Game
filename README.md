@@ -21,3 +21,7 @@ Charge a jump, hop shaky stone platforms, and race your high score up a fantasy 
 ## Stack
 
 Vanilla JavaScript (ES modules), HTML5 Canvas, Web Audio. No framework, no bundler — static files only.
+
+## Audio attribution
+
+Background music: **Cathedral in the forest (ambient loop)** by [congusbongus](https://opengameart.org/users/congusbongus), from [OpenGameArt](https://opengameart.org/content/cathedral-in-the-forest-ambient-loop). License: [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
