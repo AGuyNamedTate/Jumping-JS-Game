@@ -7,6 +7,11 @@ import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './constants.js';
 import * as playerMod from './player.js';
 import * as platforms from './platforms.js';
 import * as cameraMod from './camera.js';
+import {
+  createBirdRescue,
+  updateBirdRescue as stepBirdRescue,
+  isBirdRescueActive,
+} from './birdRescue.js';
 
 /**
  * @typedef {{
@@ -22,6 +27,7 @@ import * as cameraMod from './camera.js';
  *   cosmetics: { hat: boolean, goldenSword: boolean },
  *   onLand: ((platform: object) => void) | null,
  *   _wasGrounded: boolean,
+ *   birdRescue: ReturnType<typeof createBirdRescue> | null,
  * }} Session
  */
 
@@ -59,6 +65,7 @@ export function createSession(opts = {}) {
     },
     onLand: opts.onLand ?? null,
     _wasGrounded: true,
+    birdRescue: null,
   };
 }
 
@@ -85,6 +92,7 @@ export function resetSession(session, opts = {}) {
   session.safetyUsed = false;
   session.status = 'ok';
   session._wasGrounded = true;
+  session.birdRescue = null;
 
   if (opts.cosmetics) {
     session.cosmetics.hat = !!opts.cosmetics.hat;
@@ -103,6 +111,8 @@ export function resetSession(session, opts = {}) {
  */
 export function updateSession(session, dt, input) {
   if (session.status === 'dead') return 'dead';
+  // Gameplay frozen while the rescue bird cinematic plays.
+  if (isRescueBirdAnimating(session)) return session.status;
 
   const { player, world, camera } = session;
 
@@ -192,7 +202,8 @@ export function drawSession(ctx, session) {
 }
 
 /**
- * Carry player to a safe platform; marks bird used for this run.
+ * Instantly place player on rescue target; marks bird used for this run.
+ * Prefer {@link startRescueBird} for the live continue cinematic.
  * @param {Session} session
  * @returns {boolean}
  */
@@ -200,6 +211,89 @@ export function applyRescueBird(session) {
   const target = platforms.findRescueTarget(session.world, session.player.y);
   if (!target) return false;
 
+  placePlayerOnPlatform(session, target);
+  session.birdRescue = null;
+  session.birdUsed = true;
+  session.continuesUsed += 1;
+  session.status = 'ok';
+  return true;
+}
+
+/**
+ * Begin bird rescue cinematic (pause physics until complete).
+ * Marks bird used and bumps continuesUsed once at start; final placement in {@link updateRescueBird}.
+ * @param {Session} session
+ * @returns {boolean}
+ */
+export function startRescueBird(session) {
+  const target = platforms.findRescueTarget(session.world, session.player.y);
+  if (!target) return false;
+
+  const p = session.player;
+  p.vx = 0;
+  p.vy = 0;
+  p.charge = 0;
+  p.grounded = false;
+
+  const anim = createBirdRescue(p, target);
+  if (!anim) return false;
+
+  session.birdRescue = anim;
+  session.birdUsed = true;
+  session.continuesUsed += 1;
+  session.status = 'ok';
+  return true;
+}
+
+/**
+ * Advance bird rescue cinematic; syncs player pose. Returns true when it just finished.
+ * @param {Session} session
+ * @param {number} dt
+ * @returns {boolean}
+ */
+export function updateRescueBird(session, dt) {
+  if (!session.birdRescue) return false;
+
+  const { done } = stepBirdRescue(session.birdRescue, dt);
+  const anim = session.birdRescue;
+  const p = session.player;
+  p.x = anim.playerX;
+  p.y = anim.playerY;
+  p.vx = 0;
+  p.vy = 0;
+  p.charge = 0;
+  p.grounded = false;
+
+  framePlayerInView(session);
+
+  if (!done) return false;
+
+  p.x = anim.destX;
+  p.y = anim.destY;
+  p.vx = 0;
+  p.vy = 0;
+  p.grounded = true;
+  p.charge = 0;
+  session.birdRescue = null;
+  session.status = 'ok';
+  session._wasGrounded = true;
+  framePlayerInView(session);
+  return true;
+}
+
+/**
+ * @param {Session} session
+ * @returns {boolean}
+ */
+export function isRescueBirdAnimating(session) {
+  return isBirdRescueActive(session?.birdRescue);
+}
+
+/**
+ * @param {Session} session
+ * @param {{ x: number, y: number, w: number }} target
+ */
+function placePlayerOnPlatform(session, target) {
   const p = session.player;
   p.x = target.x + target.w / 2 - p.w / 2;
   p.y = target.y - p.h;
@@ -207,12 +301,7 @@ export function applyRescueBird(session) {
   p.vy = 0;
   p.grounded = true;
   p.charge = 0;
-
   framePlayerInView(session);
-  session.birdUsed = true;
-  session.continuesUsed += 1;
-  session.status = 'ok';
-  return true;
 }
 
 /**
