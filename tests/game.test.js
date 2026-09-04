@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MAX_CONTINUES } from '../js/constants.js';
+import { MAX_CONTINUES, FIXED_DT } from '../js/constants.js';
 import { stubCanvas2d } from './setup.js';
 
 describe('game', () => {
@@ -307,17 +307,55 @@ describe('game', () => {
       expect(game.getState()).toBe('gameOver');
     });
 
-    it('bird success resumes playing', async () => {
+    it('bird success starts cinematic and resumes playing', async () => {
       storage.addInventory('rescueBird', 1);
-      const applyBird = vi.spyOn(gameplay, 'applyRescueBird');
+      const startBird = vi.spyOn(gameplay, 'startRescueBird');
+      const playSfx = vi.spyOn(audio, 'playSfx');
 
       await forceDanger();
       expect(game.getState()).toBe('continueOffer');
       expect(lastContinueOpts.hasBird).toBe(true);
 
       lastContinueOpts.onUseBird();
-      expect(applyBird).toHaveBeenCalled();
+      expect(startBird).toHaveBeenCalled();
+      expect(playSfx).toHaveBeenCalledWith('rescue');
       expect(game.getState()).toBe('playing');
+      expect(capturedSession.birdRescue).toBeTruthy();
+      expect(gameplay.isRescueBirdAnimating(capturedSession)).toBe(true);
+    });
+
+    it('bird cinematic freezes physics until complete then lands on platform', async () => {
+      storage.addInventory('rescueBird', 1);
+      await forceDanger();
+      lastContinueOpts.onUseBird();
+      expect(game.getState()).toBe('playing');
+      expect(gameplay.isRescueBirdAnimating(capturedSession)).toBe(true);
+
+      const x0 = capturedSession.player.x;
+      const y0 = capturedSession.player.y;
+      // One step should advance anim without normal physics (no updateSession spy)
+      vi.spyOn(gameplay, 'updateSession');
+      game.step(FIXED_DT);
+      expect(gameplay.updateSession).not.toHaveBeenCalled();
+      expect(capturedSession.player.x !== x0 || capturedSession.player.y !== y0 || capturedSession.birdRescue.t > 0).toBe(
+        true,
+      );
+
+      // Drain cinematic
+      for (let i = 0; i < 200 && gameplay.isRescueBirdAnimating(capturedSession); i++) {
+        game.step(FIXED_DT);
+      }
+      expect(gameplay.isRescueBirdAnimating(capturedSession)).toBe(false);
+      expect(capturedSession.player.grounded).toBe(true);
+      const standingY = capturedSession.player.y + 26;
+      const under = capturedSession.world.platforms.find(
+        (p) =>
+          !p.broken &&
+          Math.abs(p.y - standingY) < 0.5 &&
+          capturedSession.player.x + 18 > p.x &&
+          capturedSession.player.x < p.x + p.w,
+      );
+      expect(under).toBeTruthy();
     });
 
     it('safety success resumes playing', async () => {

@@ -16,7 +16,9 @@ import {
   createSession,
   resetSession,
   updateSession,
-  applyRescueBird,
+  startRescueBird,
+  updateRescueBird,
+  isRescueBirdAnimating,
   applySafetyPlatform,
 } from './gameplay.js';
 import * as art from './art.js';
@@ -150,6 +152,18 @@ function update(dt) {
     return;
   }
 
+  // Bird rescue cinematic: freeze input / physics / danger progression.
+  if (isRescueBirdAnimating(session)) {
+    updateRescueBird(session, dt);
+    run.continuesUsed = session.continuesUsed;
+    hudScore.setTrueScore(run.height, run.score);
+    hudScore.setAscending(false);
+    hudScore.update(dt);
+    art.updateParticles(dt);
+    syncPlayingHud(storage.load());
+    return;
+  }
+
   input.update();
   const inputState = input.getState();
 
@@ -248,7 +262,11 @@ function tryOfferContinue() {
         endRun();
         return;
       }
-      applyRescueBird(session);
+      const started = startRescueBird(session);
+      if (!started) {
+        endRun();
+        return;
+      }
       audio.playSfx('rescue');
       resumeAfterContinue();
     },
@@ -319,6 +337,9 @@ function draw() {
       hat: session.cosmetics.hat,
       goldenSword: session.cosmetics.goldenSword,
     });
+    if (session.birdRescue && isRescueBirdAnimating(session)) {
+      art.drawBird(ctx, session.birdRescue.birdX, session.birdRescue.birdY, camY);
+    }
     if (session.player.grounded && session.player.charge > 0) {
       art.drawChargeBar(ctx, session.player, camY, session.player.charge);
     }
@@ -493,6 +514,14 @@ if (typeof window !== 'undefined') {
             score: session.score,
             continuesUsed: session.continuesUsed,
             status: session.status,
+            birdRescue: session.birdRescue
+              ? {
+                  active: session.birdRescue.active,
+                  phase: session.birdRescue.phase,
+                  t: session.birdRescue.t,
+                  duration: session.birdRescue.duration,
+                }
+              : null,
             platforms: session.world.platforms
               .filter((p) => !p.broken)
               .map((p) => ({

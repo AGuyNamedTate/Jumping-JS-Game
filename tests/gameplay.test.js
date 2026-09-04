@@ -6,7 +6,11 @@ import {
   drawSession,
   applyRescueBird,
   applySafetyPlatform,
+  startRescueBird,
+  updateRescueBird,
+  isRescueBirdAnimating,
 } from '../js/gameplay.js';
+import { BIRD_RESCUE_DURATION } from '../js/birdRescue.js';
 import { PLAYER_W, PLAYER_H } from '../js/player.js';
 import {
   LOGICAL_WIDTH,
@@ -14,6 +18,7 @@ import {
   DANGER_LINE_MARGIN,
   MOVE_SPEED,
   PLATFORM_THICKNESS,
+  FIXED_DT,
 } from '../js/constants.js';
 
 function idleInput(overrides = {}) {
@@ -399,6 +404,100 @@ describe('gameplay', () => {
       applyRescueBird(session);
       const viewBottom = session.camera.y + LOGICAL_HEIGHT;
       expect(session.player.y + PLAYER_H).toBeLessThanOrEqual(viewBottom - 40 + 1);
+    });
+  });
+
+  describe('startRescueBird / updateRescueBird', () => {
+    it('starts cinematic without instantly teleporting onto the platform', () => {
+      const session = createSession();
+      session.status = 'danger';
+      session.player.vy = 400;
+      const startX = session.player.x;
+      const startY = session.player.y;
+      const used = session.continuesUsed;
+
+      expect(startRescueBird(session)).toBe(true);
+      expect(isRescueBirdAnimating(session)).toBe(true);
+      expect(session.continuesUsed).toBe(used + 1);
+      expect(session.status).toBe('ok');
+      expect(session.player.x).toBe(startX);
+      expect(session.player.y).toBe(startY);
+      expect(session.player.vx).toBe(0);
+      expect(session.player.vy).toBe(0);
+      expect(session.birdRescue.phase).toBe('approach');
+    });
+
+    it('pauses gameplay physics and input while animating', () => {
+      const session = createSession();
+      startRescueBird(session);
+      const x0 = session.player.x;
+      const y0 = session.player.y;
+
+      const status = updateSession(session, 0.2, idleInput({ moveX: 1, charging: true }));
+      expect(status).toBe('ok');
+      expect(session.player.x).toBe(x0);
+      expect(session.player.y).toBe(y0);
+      expect(session.player.charge).toBe(0);
+      expect(isRescueBirdAnimating(session)).toBe(true);
+    });
+
+    it('finishes on a valid solid platform after the cinematic', () => {
+      const session = createSession();
+      session.player.vy = 300;
+      expect(startRescueBird(session)).toBe(true);
+
+      let finished = false;
+      for (let i = 0; i < 200 && !finished; i++) {
+        finished = updateRescueBird(session, FIXED_DT);
+      }
+      expect(finished).toBe(true);
+      expect(isRescueBirdAnimating(session)).toBe(false);
+      expect(session.birdRescue).toBeNull();
+      expect(session.player.grounded).toBe(true);
+      expect(session.player.vy).toBe(0);
+
+      const standingY = session.player.y + PLAYER_H;
+      const under = session.world.platforms.find(
+        (p) =>
+          !p.broken &&
+          p.type === 'solid' &&
+          Math.abs(p.y - standingY) < 0.5 &&
+          session.player.x + PLAYER_W > p.x &&
+          session.player.x < p.x + p.w,
+      );
+      expect(under).toBeTruthy();
+      expect(session.continuesUsed).toBe(1);
+    });
+
+    it('returns false when no platforms exist', () => {
+      const session = createSession();
+      session.world.platforms = [];
+      expect(startRescueBird(session)).toBe(false);
+      expect(session.birdRescue).toBeNull();
+    });
+
+    it('clears birdRescue on resetSession', () => {
+      const session = createSession();
+      startRescueBird(session);
+      expect(session.birdRescue).toBeTruthy();
+      resetSession(session);
+      expect(session.birdRescue).toBeNull();
+    });
+
+    it('cinematic length stays within 2–3 seconds at fixed step', () => {
+      const session = createSession();
+      startRescueBird(session);
+      let t = 0;
+      while (isRescueBirdAnimating(session) && t < 5) {
+        updateRescueBird(session, FIXED_DT);
+        t += FIXED_DT;
+      }
+      expect(t).toBeGreaterThanOrEqual(2 - FIXED_DT);
+      expect(t).toBeLessThanOrEqual(3 + FIXED_DT);
+      expect(session.birdRescue).toBeNull();
+      // duration constant used by create defaults
+      expect(BIRD_RESCUE_DURATION).toBeGreaterThanOrEqual(2);
+      expect(BIRD_RESCUE_DURATION).toBeLessThanOrEqual(3);
     });
   });
 
