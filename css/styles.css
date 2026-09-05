@@ -203,8 +203,9 @@ body {
 
 .tab {
   flex: 1;
-  font-size: 0.4rem;
-  padding: 0.65rem 0.35rem;
+  font-size: 0.55rem;
+  padding: 0.7rem 0.4rem;
+  letter-spacing: 0.04em;
 }
 
 .tab.active {
@@ -220,12 +221,12 @@ body {
   padding: 0.75rem;
   border: 3px solid var(--stone-dark);
   background: rgba(10, 14, 20, 0.65);
-  font-size: 0.4rem;
+  font-size: 0.5rem;
   line-height: 1.8;
 }
 
 .wallet-display {
-  font-size: 0.45rem;
+  font-size: 0.55rem;
   color: var(--torch-glow);
   margin-top: 0.25rem;
 }

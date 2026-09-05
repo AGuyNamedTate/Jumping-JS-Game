@@ -566,9 +566,9 @@ describe('gameplay', () => {
         ctx._calls.some((c) => c.style === 'rgba(120, 30, 30, 0.25)'),
       ).toBe(true);
 
-      // Hat / golden sword drawn
-      expect(ctx._calls.some((c) => c.style === '#8b2500')).toBe(true);
-      expect(ctx._calls.some((c) => c.style === '#ffd700')).toBe(true);
+      // Shared shop palette: brown hat + golden sword
+      expect(ctx._calls.some((c) => c.style === '#6b4a2a')).toBe(true);
+      expect(ctx._calls.some((c) => c.style === '#e8a838')).toBe(true);
     });
 
     it('draws strong danger line when status is danger or dead', () => {
