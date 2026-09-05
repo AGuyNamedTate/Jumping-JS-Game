@@ -95,9 +95,11 @@ describe('cosmetics.drawPreview', () => {
       goldenSword: false,
     });
     expect(ctx.fillRect).toHaveBeenCalled();
-    expect(styles).toContain('#9a9da5'); // default blade
+    expect(styles).toContain('#9a9da5'); // default blade / shield highlight
+    expect(styles).toContain('#6b6e76'); // shield body
     expect(styles).not.toContain('#e8a838'); // golden blade
     expect(styles).not.toContain('#6b4a2a'); // hat brim
+    expect(styles).not.toContain('#b33a2e'); // old in-game red hat
   });
 
   it('draws hat pixels when hat is on', () => {
@@ -129,7 +131,7 @@ describe('cosmetics.drawPreview', () => {
     expect(styles).toContain('#f5d078');
     expect(styles).toContain('#8a7050');
     expect(styles).toContain('#5a4030');
-    expect(styles).not.toContain('#9a9da5');
+    expect(styles).toContain('#6b6e76'); // shield still present
   });
 
   it('draws both hat and golden sword when both are on', () => {
