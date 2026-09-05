@@ -49,6 +49,16 @@ describe('continue', () => {
     expect(safety.getAttribute('aria-disabled')).toBe('true');
   });
 
+  it('shows both buttons but disables only the unavailable option', () => {
+    manageContinueOffer(makeHandlers({ hasBird: false, hasSafety: true }));
+    const bird = document.getElementById('btn-use-bird');
+    const safety = document.getElementById('btn-use-safety');
+    expect(bird).toBeTruthy();
+    expect(safety).toBeTruthy();
+    expect(bird.disabled).toBe(true);
+    expect(safety.disabled).toBe(false);
+  });
+
   it('counts down the timer and triggers onLetGo on timeout', () => {
     const opts = makeHandlers({ timeoutSec: 3 });
     manageContinueOffer(opts);

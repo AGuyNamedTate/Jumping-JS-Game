@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MAX_CONTINUES } from '../js/constants.js';
+import { MAX_CONTINUES, FIXED_DT } from '../js/constants.js';
 import { stubCanvas2d } from './setup.js';
 
 describe('game', () => {
@@ -117,6 +117,9 @@ describe('game', () => {
     expect(game.run.score).toBe(0);
     expect(game.run.solidLands).toBe(0);
     expect(game.run.highScoreCelebrated).toBe(false);
+    expect(game.run.birdUsed).toBe(false);
+    expect(game.run.safetyUsed).toBe(false);
+    expect(game.run.highScoreBirdGranted).toBe(false);
   });
 
   it('endRun is idempotent and fills gameover DOM', () => {
@@ -202,7 +205,7 @@ describe('game', () => {
     expect(game.getState()).toBe('gameOver');
   });
 
-  it('celebrates high score once when score exceeds prevBest', async () => {
+  it('celebrates high score once and grants one bird when score exceeds prevBest', async () => {
     storage.save({ ...storage.load(), bestScore: 10 });
     const canvas = document.getElementById('game-canvas');
     stubCanvas2d(canvas);
@@ -210,6 +213,7 @@ describe('game', () => {
     game.init(canvas, {});
     game.startGame();
     expect(game.run.prevBestScore).toBe(10);
+    expect(storage.load().inventory.rescueBird).toBe(0);
 
     const playSfx = vi.spyOn(audio, 'playSfx');
     vi.spyOn(gameplay, 'updateSession').mockImplementation((session) => {
@@ -222,7 +226,9 @@ describe('game', () => {
     game.stopLoop();
 
     expect(game.run.highScoreCelebrated).toBe(true);
+    expect(game.run.highScoreBirdGranted).toBe(true);
     expect(playSfx).toHaveBeenCalledWith('highscore');
+    expect(storage.load().inventory.rescueBird).toBe(1);
   });
 
   it('plays jump sfx when chargeJustReleased with prior charge', async () => {
@@ -262,12 +268,13 @@ describe('game', () => {
     expect(playSfx).toHaveBeenCalledWith('break');
   });
 
-  it('handleLand via onLand for solid milestones and shaky', () => {
+  it('handleLand via onLand tracks solid lands without granting birds', () => {
     game.startGame();
     expect(typeof capturedOnLand).toBe('function');
 
     const dust = vi.spyOn(art, 'spawnLandDust');
     const playSfx = vi.spyOn(audio, 'playSfx');
+    const birdsBefore = storage.load().inventory.rescueBird;
 
     capturedOnLand({ type: 'shaky' });
     expect(playSfx).toHaveBeenCalledWith('land');
@@ -278,8 +285,7 @@ describe('game', () => {
       capturedOnLand({ type: 'solid' });
     }
     expect(game.run.solidLands).toBe(15);
-    expect(game.run.landGrantsGiven).toBe(1);
-    expect(storage.load().inventory.rescueBird).toBeGreaterThanOrEqual(1);
+    expect(storage.load().inventory.rescueBird).toBe(birdsBefore);
   });
 
   describe('continue offer flows', () => {
@@ -296,10 +302,10 @@ describe('game', () => {
       expect(game.getState()).toBe('gameOver');
     });
 
-    it('ends run when max continues already used', async () => {
+    it('ends run when bird already used this run and no safety available', async () => {
       storage.addInventory('rescueBird', 2);
       game.startGame();
-      if (capturedSession) capturedSession.continuesUsed = MAX_CONTINUES;
+      if (capturedSession) capturedSession.birdUsed = true;
       vi.spyOn(gameplay, 'updateSession').mockReturnValue('danger');
       game.startLoop();
       await flushFrames(40);
@@ -307,17 +313,84 @@ describe('game', () => {
       expect(game.getState()).toBe('gameOver');
     });
 
-    it('bird success resumes playing', async () => {
+    it('disables bird option after bird used even with birds remaining', async () => {
+      storage.addInventory('rescueBird', 2);
+      storage.addInventory('safetyPlatform', 1);
+      game.startGame();
+      if (capturedSession) capturedSession.birdUsed = true;
+      vi.spyOn(gameplay, 'updateSession').mockReturnValue('danger');
+      game.startLoop();
+      await flushFrames(40);
+      game.stopLoop();
+      expect(game.getState()).toBe('continueOffer');
+      expect(lastContinueOpts.hasBird).toBe(false);
+      expect(lastContinueOpts.hasSafety).toBe(true);
+    });
+
+    it('ends run when both continue types already used this run', async () => {
+      storage.addInventory('rescueBird', 5);
+      storage.addInventory('safetyPlatform', 5);
+      game.startGame();
+      if (capturedSession) {
+        capturedSession.birdUsed = true;
+        capturedSession.safetyUsed = true;
+      }
+      vi.spyOn(gameplay, 'updateSession').mockReturnValue('danger');
+      game.startLoop();
+      await flushFrames(40);
+      game.stopLoop();
+      expect(game.getState()).toBe('gameOver');
+    });
+
+    it('bird success starts cinematic and resumes playing', async () => {
       storage.addInventory('rescueBird', 1);
-      const applyBird = vi.spyOn(gameplay, 'applyRescueBird');
+      const startBird = vi.spyOn(gameplay, 'startRescueBird');
+      const playSfx = vi.spyOn(audio, 'playSfx');
 
       await forceDanger();
       expect(game.getState()).toBe('continueOffer');
       expect(lastContinueOpts.hasBird).toBe(true);
 
       lastContinueOpts.onUseBird();
-      expect(applyBird).toHaveBeenCalled();
+      expect(startBird).toHaveBeenCalled();
+      expect(playSfx).toHaveBeenCalledWith('rescue');
       expect(game.getState()).toBe('playing');
+      expect(capturedSession.birdRescue).toBeTruthy();
+      expect(gameplay.isRescueBirdAnimating(capturedSession)).toBe(true);
+    });
+
+    it('bird cinematic freezes physics until complete then lands on platform', async () => {
+      storage.addInventory('rescueBird', 1);
+      await forceDanger();
+      lastContinueOpts.onUseBird();
+      expect(game.getState()).toBe('playing');
+      expect(gameplay.isRescueBirdAnimating(capturedSession)).toBe(true);
+
+      const x0 = capturedSession.player.x;
+      const y0 = capturedSession.player.y;
+      // One step should advance anim without normal physics (no updateSession spy)
+      vi.spyOn(gameplay, 'updateSession');
+      game.step(FIXED_DT);
+      expect(gameplay.updateSession).not.toHaveBeenCalled();
+      expect(capturedSession.player.x !== x0 || capturedSession.player.y !== y0 || capturedSession.birdRescue.t > 0).toBe(
+        true,
+      );
+
+      // Drain cinematic
+      for (let i = 0; i < 200 && gameplay.isRescueBirdAnimating(capturedSession); i++) {
+        game.step(FIXED_DT);
+      }
+      expect(gameplay.isRescueBirdAnimating(capturedSession)).toBe(false);
+      expect(capturedSession.player.grounded).toBe(true);
+      const standingY = capturedSession.player.y + 26;
+      const under = capturedSession.world.platforms.find(
+        (p) =>
+          !p.broken &&
+          Math.abs(p.y - standingY) < 0.5 &&
+          capturedSession.player.x + 18 > p.x &&
+          capturedSession.player.x < p.x + p.w,
+      );
+      expect(under).toBeTruthy();
     });
 
     it('safety success resumes playing', async () => {
@@ -425,14 +498,15 @@ describe('game', () => {
     game.step(1 / 30);
   });
 
-  it('injectStatus danger/dead/ok and continuesUsed', () => {
+  it('injectStatus danger/dead/ok and birdUsed / safetyUsed', () => {
     storage.addInventory('rescueBird', 1);
+    storage.addInventory('safetyPlatform', 1);
     game.startGame();
     game.injectStatus('ok');
     expect(capturedSession.status).toBe('ok');
 
-    game.injectStatus('danger', { continuesUsed: 1 });
-    expect(game.run.continuesUsed).toBe(1);
+    game.injectStatus('danger', { birdUsed: true });
+    expect(game.run.birdUsed).toBe(true);
     expect(game.getState()).toBe('continueOffer');
 
     game.goMainMenu();

@@ -51,98 +51,94 @@ describe('inventory.checkMilestones', () => {
     seed({ inventory: { rescueBird: 0, safetyPlatform: 0 }, bestScore: 0 });
   });
 
-  it('grants birds when bestScore newly crosses a 500 band', () => {
+  it('grants exactly one bird when beating previous personal best', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
     seed({ bestScore: 500, inventory: { rescueBird: 0, safetyPlatform: 0 } });
-    const save = storage.load();
-    const result = checkMilestones(save, { prevBestScore: 499 });
+    const runStats = { prevBestScore: 100, currentScore: 500 };
+    const result = checkMilestones(storage.load(), runStats);
     expect(result.grants).toHaveLength(1);
     expect(result.grants[0]).toMatchObject({
-      type: 'scoreBand',
+      type: 'newHighScore',
       item: 'rescueBird',
       amount: 1,
     });
     expect(result.notified).toBe(true);
     expect(result.save.inventory.rescueBird).toBe(1);
-    expect(info).toHaveBeenCalledWith(
-      expect.stringContaining('[milestone]'),
-    );
+    expect(runStats.highScoreBirdGranted).toBe(true);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining('[milestone]'));
   });
 
-  it('grants multiple birds when jumping several score bands', () => {
+  it('grants only one bird even when jumping far past previous best', () => {
     vi.spyOn(console, 'info').mockImplementation(() => {});
     seed({ bestScore: 1600, inventory: { rescueBird: 0, safetyPlatform: 0 } });
     const result = checkMilestones(storage.load(), { prevBestScore: 100 });
-    // prevBand 0, curBand 3 → 3 birds
     expect(result.grants).toEqual([
-      expect.objectContaining({
-        type: 'scoreBand',
-        amount: 3,
-        detail: expect.stringContaining('birds'),
-      }),
+      expect.objectContaining({ type: 'newHighScore', amount: 1 }),
     ]);
-    expect(result.save.inventory.rescueBird).toBe(3);
+    expect(result.save.inventory.rescueBird).toBe(1);
   });
 
-  it('does not grant when staying in the same score band', () => {
+  it('does not grant when score does not beat previous best', () => {
     seed({ bestScore: 900, inventory: { rescueBird: 0, safetyPlatform: 0 } });
-    const result = checkMilestones(storage.load(), { prevBestScore: 500 });
-    expect(result.grants.filter((g) => g.type === 'scoreBand')).toHaveLength(0);
+    const result = checkMilestones(storage.load(), { prevBestScore: 1000 });
+    expect(result.grants).toEqual([]);
     expect(result.notified).toBe(false);
   });
 
-  it('grants solid-land birds every 15 lands and mutates landGrantsGiven', () => {
-    vi.spyOn(console, 'info').mockImplementation(() => {});
-    const runStats = { solidLands: 30, landGrantsGiven: 0 };
-    const result = checkMilestones(storage.load(), runStats);
-    expect(result.grants).toEqual([
-      expect.objectContaining({
-        type: 'solidLands',
-        amount: 2,
-        detail: expect.stringContaining('birds'),
-      }),
-    ]);
-    expect(runStats.landGrantsGiven).toBe(2);
-    expect(result.save.inventory.rescueBird).toBe(2);
+  it('does not grant when already granted this run', () => {
+    seed({ bestScore: 500, inventory: { rescueBird: 0, safetyPlatform: 0 } });
+    const result = checkMilestones(storage.load(), {
+      prevBestScore: 0,
+      highScoreBirdGranted: true,
+    });
+    expect(result.grants).toEqual([]);
+    expect(result.notified).toBe(false);
+    expect(storage.load().inventory.rescueBird).toBe(0);
   });
 
-  it('only awards newly earned land grants', () => {
-    vi.spyOn(console, 'info').mockImplementation(() => {});
-    seed({ inventory: { rescueBird: 1, safetyPlatform: 0 } });
-    const runStats = { solidLands: 45, landGrantsGiven: 2 };
+  it('does not grant birds for solid-land milestones', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const runStats = {
+      solidLands: 30,
+      landGrantsGiven: 0,
+      prevBestScore: 100,
+      currentScore: 50,
+    };
+    seed({ bestScore: 50 });
     const result = checkMilestones(storage.load(), runStats);
-    expect(result.grants[0]).toMatchObject({ type: 'solidLands', amount: 1 });
-    expect(runStats.landGrantsGiven).toBe(3);
-    expect(result.save.inventory.rescueBird).toBe(2);
+    expect(result.grants).toEqual([]);
+    expect(result.notified).toBe(false);
+    expect(storage.load().inventory.rescueBird).toBe(0);
+    expect(info).not.toHaveBeenCalled();
   });
 
-  it('uses singular wording for a single land grant', () => {
-    vi.spyOn(console, 'info').mockImplementation(() => {});
-    const runStats = { solidLands: 15, landGrantsGiven: 0 };
-    const result = checkMilestones(storage.load(), runStats);
-    expect(result.grants[0].detail).toMatch(/bird(?!s)/);
+  it('does not grant birds for score-band crossings alone without beating prev best via grant path already covered', () => {
+    // Staying at or below prevBest: no grant even if bestScore is a round band.
+    seed({ bestScore: 1000, inventory: { rescueBird: 0, safetyPlatform: 0 } });
+    const result = checkMilestones(storage.load(), { prevBestScore: 1000 });
+    expect(result.grants).toEqual([]);
   });
 
   it('is a no-op when nothing is earned', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
-    const runStats = { solidLands: 14, landGrantsGiven: 0, prevBestScore: 0 };
     seed({ bestScore: 100 });
-    const result = checkMilestones(storage.load(), runStats);
+    const result = checkMilestones(storage.load(), {
+      prevBestScore: 100,
+      currentScore: 50,
+    });
     expect(result.grants).toEqual([]);
     expect(result.notified).toBe(false);
-    expect(runStats.landGrantsGiven).toBe(0);
     expect(info).not.toHaveBeenCalled();
   });
 
-  it('combines score-band and solid-land grants in one call', () => {
+  it('uses currentScore when it exceeds prevBest even if save.bestScore lags', () => {
     vi.spyOn(console, 'info').mockImplementation(() => {});
-    seed({ bestScore: 1000, inventory: { rescueBird: 0, safetyPlatform: 0 } });
-    const runStats = { prevBestScore: 0, solidLands: 15, landGrantsGiven: 0 };
+    seed({ bestScore: 10, inventory: { rescueBird: 0, safetyPlatform: 0 } });
+    const runStats = { prevBestScore: 10, currentScore: 40 };
     const result = checkMilestones(storage.load(), runStats);
-    expect(result.grants).toHaveLength(2);
-    expect(result.grants.map((g) => g.type)).toEqual(['scoreBand', 'solidLands']);
-    expect(result.save.inventory.rescueBird).toBe(3); // 2 bands + 1 land
-    expect(runStats.landGrantsGiven).toBe(1);
+    expect(result.grants[0].type).toBe('newHighScore');
+    expect(result.save.inventory.rescueBird).toBe(1);
+    expect(runStats.highScoreBirdGranted).toBe(true);
   });
 
   it('loads save when save arg is nullish', () => {
@@ -151,25 +147,24 @@ describe('inventory.checkMilestones', () => {
     const result = checkMilestones(/** @type {any} */ (null), {
       prevBestScore: 0,
     });
-    expect(result.grants[0].type).toBe('scoreBand');
+    expect(result.grants[0].type).toBe('newHighScore');
   });
 
-  it('treats non-finite prevBestScore / solidLands as zero', () => {
+  it('treats non-finite prevBestScore / currentScore as zero', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
     seed({ bestScore: 10 });
     const result = checkMilestones(storage.load(), {
       prevBestScore: NaN,
-      solidLands: undefined,
-      landGrantsGiven: undefined,
+      currentScore: undefined,
     });
-    expect(result.grants).toEqual([]);
-    expect(info).not.toHaveBeenCalled();
+    // bestScore 10 > prevBest 0 → grant
+    expect(result.grants).toHaveLength(1);
+    expect(info).toHaveBeenCalled();
   });
 
-  it('floors negative bestScore / solidLands when computing grants', () => {
+  it('floors negative bestScore when computing grants', () => {
     const save = { ...storage.load(), bestScore: -50 };
-    const runStats = { solidLands: -5, landGrantsGiven: 0, prevBestScore: -10 };
-    const result = checkMilestones(save, runStats);
+    const result = checkMilestones(save, { prevBestScore: -10, currentScore: -5 });
     expect(result.grants).toEqual([]);
   });
 
