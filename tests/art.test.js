@@ -84,22 +84,45 @@ describe('art', () => {
   });
 
   describe('drawPlayer', () => {
-    const base = { x: 100, y: 200, w: 28, h: 36 };
+    const base = { x: 100, y: 200, w: 18, h: 26 };
 
-    it('draws facing right without cosmetics', () => {
-      drawPlayer(ctx, { ...base, facing: 1 }, 0, null);
-      expect(ctx.fillRect).toHaveBeenCalled();
+    /** @returns {{ ctx: any, styles: string[] }} */
+    function styledCtx() {
+      const styles = /** @type {string[]} */ ([]);
+      const local = createMock2dContext();
+      Object.defineProperty(local, 'fillStyle', {
+        set(v) {
+          this._fs = v;
+        },
+        get() {
+          return this._fs;
+        },
+      });
+      local.fillRect = vi.fn(function fillRect() {
+        styles.push(String(this.fillStyle));
+      });
+      return { ctx: local, styles };
+    }
+
+    it('draws facing right without cosmetics using shop palette + shield', () => {
+      const { ctx: local, styles } = styledCtx();
+      drawPlayer(local, { ...base, facing: 1 }, 0, null);
+      expect(styles).toContain('#6b6e76');
+      expect(styles).toContain('#9a9da5');
+      expect(styles).not.toContain('#b33a2e');
     });
 
-    it('draws facing left with hat and golden sword', () => {
-      drawPlayer(ctx, { ...base, facing: -1 }, 10, {
+    it('draws facing left with brown hat and golden sword', () => {
+      const { ctx: local, styles } = styledCtx();
+      drawPlayer(local, { ...base, facing: -1 }, 10, {
         hat: true,
         goldenSword: true,
       });
-      expect(ctx.beginPath).toHaveBeenCalled();
-      expect(ctx.fill).toHaveBeenCalled();
-      // gold accent fillRect for sword glow
-      expect(ctx.fillRect.mock.calls.length).toBeGreaterThan(10);
+      expect(styles).toContain('#6b4a2a');
+      expect(styles).toContain('#8a6238');
+      expect(styles).toContain('#e8a838');
+      expect(styles).not.toContain('#b33a2e');
+      expect(local.fillRect.mock.calls.length).toBeGreaterThan(10);
     });
 
     it('accepts goldSword alias and default facing', () => {

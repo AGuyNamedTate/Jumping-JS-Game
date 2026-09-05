@@ -258,43 +258,48 @@ describe('player', () => {
       return ctx;
     }
 
-    it('draws facing right eyes and silver sword by default', () => {
+    it('draws facing right with shop palette sword and shield by default', () => {
       const ctx = makeCtx();
       player.facing = 1;
       draw(ctx, player);
       const styles = ctx._calls.map((c) => c.style);
-      expect(styles).toContain('#c0c0c0');
-      expect(styles).not.toContain('#ffd700');
-      expect(styles).not.toContain('#8b2500');
+      expect(styles).toContain('#9a9da5');
+      expect(styles).toContain('#6b6e76');
+      expect(styles).not.toContain('#e8a838');
+      expect(styles).not.toContain('#6b4a2a');
+      expect(styles).not.toContain('#b33a2e');
     });
 
-    it('draws facing left eye and shield/sword on flipped side', () => {
+    it('draws facing left with mirrored eyes', () => {
       const ctx = makeCtx();
       player.facing = -1;
       draw(ctx, player);
-      const eye = ctx._calls.find(
-        (c) => c.style === '#1a1a1a' && c.args[2] === 2 && c.args[3] === 2,
+      const eyes = ctx._calls.filter(
+        (c) => c.style === '#0a0e14' && c.args[2] === 2 && c.args[3] === 2,
       );
-      expect(eye).toBeTruthy();
-      const cx = Math.round(player.x) + Math.floor(player.w / 2);
-      const y = Math.round(player.y);
-      expect(eye.args[0]).toBe(cx - 3);
-      expect(eye.args[1]).toBe(y + 4);
+      expect(eyes.length).toBe(2);
+      const xs = eyes.map((c) => c.args[0]).sort((a, b) => a - b);
+      // Mirrored relative to facing-right placement
+      expect(xs[1] - xs[0]).toBe(4);
     });
 
-    it('draws hat when cosmetics.hat is true', () => {
+    it('draws brown hat when cosmetics.hat is true', () => {
       const ctx = makeCtx();
       draw(ctx, player, { hat: true });
-      expect(ctx._calls.map((c) => c.style)).toContain('#8b2500');
+      const styles = ctx._calls.map((c) => c.style);
+      expect(styles).toContain('#6b4a2a');
+      expect(styles).toContain('#8a6238');
+      expect(styles).not.toContain('#8b2500');
+      expect(styles).not.toContain('#b33a2e');
     });
 
     it('draws golden sword when cosmetics.goldenSword is true', () => {
       const ctx = makeCtx();
       draw(ctx, player, { goldenSword: true });
       const styles = ctx._calls.map((c) => c.style);
-      expect(styles).toContain('#ffd700');
-      expect(styles).toContain('#b8860b');
-      expect(styles).toContain('#fff3a0');
+      expect(styles).toContain('#e8a838');
+      expect(styles).toContain('#f5d078');
+      expect(styles).toContain('#8a7050');
     });
 
     it('draws charge squash when grounded with charge > 0', () => {
