@@ -13,6 +13,7 @@ import {
   AIR_CONTROL_PRE_APEX,
   AIR_CONTROL_POST_APEX,
 } from './constants.js';
+import { drawAdventurer, ADVENTURER_W, ADVENTURER_H } from './cosmetics.js';
 
 export const PLAYER_W = 18;
 export const PLAYER_H = 26;
@@ -109,78 +110,28 @@ export function update(player, dt, input, onGround) {
 }
 
 /**
+ * Same adventurer sprite as shop / art.drawPlayer (world coords, cameraY = 0).
  * @param {CanvasRenderingContext2D} ctx
  * @param {ReturnType<typeof createPlayer>} player
  * @param {{ hat?: boolean, goldenSword?: boolean }} [cosmetics]
  */
 export function draw(ctx, player, cosmetics = {}) {
   const { hat = false, goldenSword = false } = cosmetics;
-  const f = player.facing;
   const x = Math.round(player.x);
   const y = Math.round(player.y);
-  const cx = x + Math.floor(player.w / 2);
+  const scale = Math.max(1, Math.floor(Math.min(player.w / ADVENTURER_W, player.h / ADVENTURER_H)));
+  const drawW = ADVENTURER_W * scale;
+  const drawH = ADVENTURER_H * scale;
+  const originX = x + Math.floor((player.w - drawW) / 2);
+  const originY = y + player.h - drawH;
 
-  // Legs
-  ctx.fillStyle = '#3a2a1a';
-  ctx.fillRect(cx - 5, y + 18, 4, 8);
-  ctx.fillRect(cx + 1, y + 18, 4, 8);
+  drawAdventurer(ctx, originX, originY, scale, {
+    hat,
+    goldenSword,
+    facing: player.facing,
+  });
 
-  // Boots
-  ctx.fillStyle = '#5c4030';
-  ctx.fillRect(cx - 6, y + 24, 5, 2);
-  ctx.fillRect(cx + 1, y + 24, 5, 2);
-
-  // Body tunic
-  ctx.fillStyle = '#2d6a4f';
-  ctx.fillRect(cx - 6, y + 8, 12, 11);
-
-  // Belt
-  ctx.fillStyle = '#c9a227';
-  ctx.fillRect(cx - 6, y + 15, 12, 2);
-
-  // Head
-  ctx.fillStyle = '#e8b896';
-  ctx.fillRect(cx - 5, y + 2, 10, 7);
-
-  // Hair
-  ctx.fillStyle = '#4a3728';
-  ctx.fillRect(cx - 5, y + 1, 10, 3);
-
-  // Eyes
-  ctx.fillStyle = '#1a1a1a';
-  if (f >= 0) {
-    ctx.fillRect(cx + 1, y + 4, 2, 2);
-  } else {
-    ctx.fillRect(cx - 3, y + 4, 2, 2);
-  }
-
-  // Hat cosmetic
-  if (hat) {
-    ctx.fillStyle = '#8b2500';
-    ctx.fillRect(cx - 6, y - 1, 12, 3);
-    ctx.fillRect(cx - 4, y - 5, 8, 4);
-    ctx.fillStyle = '#c9a227';
-    ctx.fillRect(cx - 1, y - 5, 2, 2);
-  }
-
-  // Shield (behind facing side)
-  const shieldX = f >= 0 ? cx - 9 : cx + 5;
-  ctx.fillStyle = '#6c757d';
-  ctx.fillRect(shieldX, y + 9, 4, 8);
-  ctx.fillStyle = '#adb5bd';
-  ctx.fillRect(shieldX + 1, y + 10, 2, 6);
-
-  // Sword
-  const swordX = f >= 0 ? cx + 6 : cx - 8;
-  ctx.fillStyle = goldenSword ? '#ffd700' : '#c0c0c0';
-  ctx.fillRect(swordX, y + 6, 2, 12);
-  ctx.fillStyle = goldenSword ? '#b8860b' : '#8b6914';
-  ctx.fillRect(swordX - 1, y + 10, 4, 2);
-  // Tip
-  ctx.fillStyle = goldenSword ? '#fff3a0' : '#e8e8e8';
-  ctx.fillRect(swordX, y + 4, 2, 2);
-
-  // Charge crouch squash
+  // Charge crouch squash cue
   if (player.grounded && player.charge > 0) {
     const squash = Math.floor(player.charge * 3);
     ctx.fillStyle = 'rgba(255, 220, 100, 0.35)';
