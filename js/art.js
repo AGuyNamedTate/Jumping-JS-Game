@@ -4,6 +4,7 @@
  */
 
 import { PLATFORM_THICKNESS } from './constants.js';
+import { ADVENTURER_H, ADVENTURER_W, drawAdventurer } from './cosmetics.js';
 
 /** @type {{ x: number, y: number, vx: number, vy: number, life: number, color: string, size: number }[]} */
 const particles = [];
@@ -171,85 +172,29 @@ export function drawPlatform(ctx, platform, cameraY) {
 }
 
 /**
- * Chunky ~64px adventurer.
+ * In-game adventurer — same shop sprite, scaled into the player box.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ x: number, y: number, w?: number, h?: number, facing?: number, onGround?: boolean }} player
  * @param {number} cameraY
  * @param {{ hat?: boolean, goldSword?: boolean, goldenSword?: boolean }|null} [cosmetics]
  */
 export function drawPlayer(ctx, player, cameraY, cosmetics = null) {
-  const pw = Math.floor(player.w ?? 28);
-  const ph = Math.floor(player.h ?? 36);
+  const pw = Math.floor(player.w ?? 18);
+  const ph = Math.floor(player.h ?? 26);
   const px = Math.floor(player.x);
   const py = sy(player.y, cameraY);
-  const face = (player.facing ?? 1) >= 0 ? 1 : -1;
   const cos = cosmetics ?? {};
-  const gold = Boolean(cos.goldSword || cos.goldenSword);
-  const hat = Boolean(cos.hat);
+  const scale = Math.max(1, Math.floor(Math.min(pw / ADVENTURER_W, ph / ADVENTURER_H)));
+  const drawW = ADVENTURER_W * scale;
+  const drawH = ADVENTURER_H * scale;
+  const originX = px + Math.floor((pw - drawW) / 2);
+  const originY = py + ph - drawH;
 
-  // Body (tunic)
-  ctx.fillStyle = '#3d6b4f';
-  ctx.fillRect(px + 6, py + 12, pw - 12, ph - 18);
-
-  // Legs
-  ctx.fillStyle = '#2a4a36';
-  ctx.fillRect(px + 7, py + ph - 10, 6, 10);
-  ctx.fillRect(px + pw - 13, py + ph - 10, 6, 10);
-
-  // Boots
-  ctx.fillStyle = '#4a3220';
-  ctx.fillRect(px + 6, py + ph - 4, 8, 4);
-  ctx.fillRect(px + pw - 14, py + ph - 4, 8, 4);
-
-  // Head
-  ctx.fillStyle = '#e8c4a0';
-  ctx.fillRect(px + 8, py + 2, pw - 16, 12);
-
-  // Hair / hood
-  ctx.fillStyle = '#2a1e14';
-  ctx.fillRect(px + 8, py + 1, pw - 16, 4);
-
-  if (hat) {
-    // Pointed adventurer hat
-    ctx.fillStyle = '#b33a2e';
-    ctx.fillRect(px + 6, py - 2, pw - 12, 5);
-    ctx.fillStyle = '#8a2820';
-    ctx.beginPath();
-    ctx.moveTo(px + Math.floor(pw / 2), py - 14);
-    ctx.lineTo(px + 4, py);
-    ctx.lineTo(px + pw - 4, py);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#e8a838';
-    ctx.fillRect(px + Math.floor(pw / 2) - 1, py - 4, 3, 3);
-  }
-
-  // Eyes
-  ctx.fillStyle = '#0a0e14';
-  const eyeX = face > 0 ? px + pw - 14 : px + 10;
-  ctx.fillRect(eyeX, py + 6, 3, 3);
-
-  // Shield (behind on left, or opposite of facing)
-  const shieldX = face > 0 ? px - 2 : px + pw - 6;
-  ctx.fillStyle = '#6b6e76';
-  ctx.fillRect(shieldX, py + 14, 8, 14);
-  ctx.fillStyle = '#9a9da5';
-  ctx.fillRect(shieldX + 1, py + 15, 6, 4);
-  ctx.fillStyle = '#e8a838';
-  ctx.fillRect(shieldX + 2, py + 18, 4, 4);
-
-  // Sword
-  const swordX = face > 0 ? px + pw - 4 : px - 2;
-  ctx.fillStyle = gold ? '#e8a838' : '#9a9da5';
-  ctx.fillRect(swordX, py + 8, 4, 18);
-  ctx.fillStyle = gold ? '#f5d078' : '#c8ccd4';
-  ctx.fillRect(swordX + 1, py + 6, 2, 4);
-  ctx.fillStyle = '#4a3220';
-  ctx.fillRect(swordX, py + 24, 4, 6);
-  if (gold) {
-    ctx.fillStyle = '#f5d078';
-    ctx.fillRect(swordX - 1, py + 10, 6, 2);
-  }
+  drawAdventurer(ctx, originX, originY, scale, {
+    hat: Boolean(cos.hat),
+    goldenSword: Boolean(cos.goldSword || cos.goldenSword),
+    facing: player.facing ?? 1,
+  });
 }
 
 /**

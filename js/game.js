@@ -357,7 +357,7 @@ function draw() {
     const visuals = getEquippedVisuals(storage.load());
     art.drawPlayer(
       ctx,
-      { x: LOGICAL_WIDTH / 2 - 14, y: LOGICAL_HEIGHT * 0.55, w: 28, h: 36, facing: 1 },
+      { x: LOGICAL_WIDTH / 2 - 9, y: LOGICAL_HEIGHT * 0.55, w: 18, h: 26, facing: 1 },
       0,
       visuals,
     );
