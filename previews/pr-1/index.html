@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fantasy Peak Climber</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="stage" class="stage">
+      <canvas id="game-canvas" width="360" height="640" aria-label="Fantasy Peak Climber game canvas"></canvas>
+
+      <!-- Main Menu -->
+      <section id="screen-main" class="screen overlay" aria-label="Main menu">
+        <h1 class="title">Fantasy Peak Climber</h1>
+        <p class="tagline">Climb the peaks. Don't look down.</p>
+        <nav class="menu-buttons">
+          <button type="button" id="btn-play" class="btn btn-primary">Play</button>
+          <button type="button" id="btn-history" class="btn">History</button>
+          <button type="button" id="btn-store" class="btn">Store</button>
+        </nav>
+        <button type="button" id="btn-mute" class="btn btn-mute" aria-label="Toggle mute" aria-pressed="false">Mute</button>
+      </section>
+
+      <!-- Run History -->
+      <section id="screen-history" class="screen overlay hidden" aria-label="Run history">
+        <h2 class="panel-title">Run History</h2>
+        <div id="history-list" class="history-list"></div>
+        <button type="button" id="btn-history-back" class="btn btn-back">Back</button>
+      </section>
+
+      <!-- Store -->
+      <section id="screen-store" class="screen overlay hidden" aria-label="Store">
+        <h2 class="panel-title">Store</h2>
+        <div class="store-tabs" role="tablist">
+          <button type="button" id="tab-cosmetics" class="btn tab active" role="tab" aria-selected="true">Cosmetics</button>
+          <button type="button" id="tab-boosts" class="btn tab" role="tab" aria-selected="false">Boosts</button>
+        </div>
+        <div id="store-cosmetics" class="store-panel" role="tabpanel"></div>
+        <div id="store-boosts" class="store-panel hidden" role="tabpanel"></div>
+        <p id="store-wallet" class="wallet-display">Wallet: 0</p>
+        <button type="button" id="btn-store-back" class="btn btn-back">Back</button>
+      </section>
+
+      <!-- Game Over -->
+      <section id="screen-gameover" class="screen overlay hidden" aria-label="Game over">
+        <h2 class="panel-title">Game Over</h2>
+        <p id="gameover-score" class="result-line">Score: 0</p>
+        <p id="gameover-height" class="result-line">Height: 0</p>
+        <nav class="menu-buttons">
+          <button type="button" id="btn-play-again" class="btn btn-primary">Play Again</button>
+          <button type="button" id="btn-gameover-menu" class="btn">Main Menu</button>
+        </nav>
+      </section>
+
+      <!-- Continue Offer -->
+      <section id="screen-continue" class="screen overlay hidden" aria-label="Continue offer">
+        <h2 class="panel-title">Hold On!</h2>
+        <p class="result-line">Use a rescue to keep climbing?</p>
+        <p id="continue-timer" class="continue-timer">6</p>
+        <nav class="menu-buttons">
+          <button type="button" id="btn-use-bird" class="btn btn-primary">Use Bird</button>
+          <button type="button" id="btn-use-safety" class="btn">Use Safety Platform</button>
+          <button type="button" id="btn-let-go" class="btn btn-danger">Let Go</button>
+        </nav>
+      </section>
+
+      <!-- In-run HUD -->
+      <div id="hud" class="hud hidden" aria-live="polite">
+        <div id="hud-highscore" class="hud-highscore">Best: 0</div>
+        <div id="hud-score" class="hud-score">0</div>
+        <div id="hud-inventory" class="hud-inventory">
+          <span id="hud-bird" class="hud-item">Bird: 0</span>
+          <span id="hud-safety" class="hud-item">Safety: 0</span>
+        </div>
+        <div id="charge-bar-wrap" class="charge-bar-wrap" aria-hidden="true">
+          <div id="charge-bar" class="charge-bar"></div>
+        </div>
+        <button type="button" id="btn-mute-hud" class="btn btn-mute btn-mute-hud" aria-label="Toggle mute" aria-pressed="false">Mute</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
